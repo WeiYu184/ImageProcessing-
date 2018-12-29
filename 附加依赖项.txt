@@ -1,0 +1,7 @@
+opencv_core220d.lib
+opencv_highgui220d.lib
+opencv_video220d.lib
+opencv_ml220d.lib
+opencv_legacy220d.lib
+opencv_imgproc220d.lib
+
