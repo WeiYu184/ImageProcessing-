@@ -1,0 +1,143 @@
+// 图像的几何处理：平移、缩放、旋转
+//
+
+#include "stdafx.h"
+#include "cv.h"
+#include "highgui.h"
+#define PAI 3.1415926
+
+using namespace cv;
+using namespace std;
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	////////////// Raw --> BMP 
+	FILE * fp = fopen("1024-1024.raw","rb");
+	unsigned char *pData = new unsigned char [1024*1024];
+	fread(pData,1,1024*1024, fp);
+	Mat bmp;
+	bmp.create(1024,1024,CV_8UC1);
+	unsigned char * pBmp = bmp.data;
+	for ( int i = 0; i < bmp.rows; i ++)
+	{
+		for ( int j = 0; j < bmp.cols; j++)
+		{
+			pBmp[i * bmp.cols + j] = pData[i * bmp.cols + j];
+		}
+	}
+	imwrite("raw2bmp.bmp",bmp);  // raw to tmp
+	fclose(fp);
+	namedWindow("raw2bmp");
+	imshow("raw2bmp",bmp);       // show the image
+	waitKey(0);
+
+	// 原图像的高度和宽度
+	int width = bmp.cols;
+	int height = bmp.rows;
+
+	///////  平移
+	int tx, ty;
+	printf("输入水平平移量和竖直平移量（tx ty）: ");
+	scanf("%d %d", &tx, &ty);
+	Mat trans;
+	trans.create(1024,1024,CV_8UC1);
+	unsigned char * pTrans = trans.data;
+	for(int i = 0;i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			if(i - ty >= 0 && j - tx >= 0 && i - ty < height && j - tx < height)
+				pTrans[i*width + j] = pBmp[(i-ty)*width + j - tx];
+			else pTrans[i*width + j] = 0;
+		}
+	}
+	namedWindow("trans");
+	imshow("trans",trans);
+	waitKey(0);
+	imwrite("trans.bmp",trans);
+
+	/////// 缩放
+	Mat zoom;
+	float fx, fy; // x轴方向缩放比率和y轴方向缩放比率
+	printf("输入x轴方向缩放比率和y轴方向缩放比率（fx fy）: ");
+	scanf("%f %f", &fx, &fy);
+	
+	// 缩放后图像的高度和宽度：
+	int nwidth = (int)(fx*(float)bmp.cols + 0.5);
+	int nheight = (int)(fy*(float)bmp.rows + 0.5);
+	zoom.create(nheight, nwidth, CV_8UC1);
+	unsigned char * pZoom = zoom.data;
+
+	for(int i = 0;i < nheight; i++)
+	{
+		for (int j = 0; j < nwidth; j++)
+		{
+			int i0 = (int)((float)i/fy + 0.5);
+			int j0 = (int)((float)j/fx + 0.5);
+			if(i0 >= 0 && j0 >= 0 && i0 < height && j0 < width)
+				pZoom[i*nwidth + j] = pBmp[i0*width + j0];
+			else pZoom[i*nwidth + j] = 0;
+		}
+	}
+
+	namedWindow("zoom");
+	imshow("zoom",zoom);
+	waitKey(0);
+	imwrite("zoom.bmp",zoom);
+
+	/////// 旋转
+	Mat rotating;
+	int angle; // 旋转角度
+	printf("输入以图像中心为旋转中心，顺时针旋转的角度(0°~360°): ");
+	scanf("%d", &angle);
+	
+	float rotate = ((float)angle*PAI)/180; // 弧度制的旋转角度
+	float Sin = sin((double)rotate);
+	float Cos = cos((double)rotate);   // 旋转角度的正弦和余弦
+	
+	float x00 = (float)(-(width - 1)/2);
+	float y00 = (float)((height - 1)/2);
+	float x01 = (float)((width - 1)/2); 
+	float y01 = (float)((height - 1)/2);
+	float x10 = (float)(-(width - 1)/2);
+	float y10 = (float)(-(height - 1)/2);
+	float x11 = (float)((width - 1)/2);
+	float y11 = (float)(-(height - 1)/2); // 原图像的四角坐标
+	
+	float m00 = Cos * x00 + Sin * y00;
+	float n00 = -Sin * x00 + Cos * y00;
+	float m01 = Cos * x01 + Sin * y01;
+	float n01 = -Sin * x01 + Cos * y01; 
+	float m10 = Cos * x10 + Sin * y10;
+    float n10 = -Sin * x10 + Cos * y10; 
+	float m11 = Cos * x11 + Sin * y11;
+    float n11 = -Sin * x11 + Cos * y11;   // 旋转后的四角坐标
+
+	int rwidth = (int)(max(fabs(m11-m00), fabs(m10-m01)) + 0.5);
+	int rheight = (int)(max(fabs(n11-n00), fabs(n10-n01)) + 0.5); // 旋转后图像的高度和宽度
+	rotating.create(rheight, rwidth, CV_8UC1);
+	unsigned char * pRotating = rotating.data;
+	float f1 = (float)(-0.5*(rwidth - 1)*Cos - 0.5*(rheight - 1)*Sin + 0.5*(rwidth - 1));
+	float f2 = (float)(0.5*(rwidth - 1)*Sin - 0.5*(rheight - 1)*Cos + 0.5*(rheight - 1));
+
+	for(int i = 0; i < rheight; i++)
+	{
+		for(int j = 0; j < rwidth; j++)
+		{
+			int i0 = (int)(-((float)j) * Sin + ((float)i)*Cos + f2 + 0.5);
+			int j0 = (int)(((float)j)*Cos + ((float)i)*Sin + f1 + 0.5);
+			if(i0 >= 0 && j0 >= 0 && i0 < height && j0 < width)
+				pRotating[i*rwidth + j] = pBmp[i0*width + j0];
+			else pRotating[i*rwidth + j] = 0;
+		}
+	}
+	namedWindow("rotating");
+	imshow("rotating",rotating);
+	waitKey(0);
+
+	imwrite("rotating.bmp",rotating);
+	return 0;
+}
+
+
+
